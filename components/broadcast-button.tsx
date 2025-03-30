@@ -1,26 +1,36 @@
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { useTranslations } from "@/components/translations-context";
+"use client"
 
-interface BroadcastButtonProps {
+import { Mic, MicOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+export function BroadcastButton({
+  isSessionActive,
+  onClick,
+}: {
   isSessionActive: boolean
   onClick: () => void
-}
-
-export function BroadcastButton({ isSessionActive, onClick }: BroadcastButtonProps) {
-  const { t } = useTranslations();
+}) {
   return (
     <Button
-      variant={isSessionActive ? "destructive" : "default"}
-      className="w-full py-6 text-lg font-medium flex items-center justify-center gap-2 motion-preset-shake"
       onClick={onClick}
+      size="lg"
+      className={`flex items-center gap-2 transition-all duration-200 px-6 py-4 h-auto ${
+        isSessionActive 
+          ? "bg-red-500 hover:bg-red-600" 
+          : "bg-primary hover:bg-primary/90"
+      }`}
     >
-      {isSessionActive && (
-        <Badge variant="secondary" className="animate-pulse bg-red-100 text-red-700">
-          {t('broadcast.live')}
-        </Badge>
+      {isSessionActive ? (
+        <>
+          <MicOff className="h-5 w-5" />
+          <span>Stop Debate</span>
+        </>
+      ) : (
+        <>
+          <Mic className="h-5 w-5" />
+          <span>Start Debate</span>
+        </>
       )}
-      {isSessionActive ? t('broadcast.end') : t('broadcast.start')}
     </Button>
   )
 } 

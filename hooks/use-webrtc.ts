@@ -3,13 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "@/lib/conversations";
-import { useTranslations } from "@/components/translations-context";
-
-export interface Tool {
-  name: string;
-  description: string;
-  parameters?: Record<string, any>;
-}
+import { Tool } from "@/lib/tools";
 
 /**
  * The return type for the hook, matching Approach A
@@ -19,7 +13,13 @@ interface UseWebRTCAudioSessionReturn {
   status: string;
   isSessionActive: boolean;
   audioIndicatorRef: React.RefObject<HTMLDivElement | null>;
-  startSession: () => Promise<void>;
+  startSession: (
+    debateValues?: {
+      username: string;
+      topic: string;
+      stance: "FOR" | "AGAINST";
+    } | null
+  ) => Promise<void>;
   stopSession: () => void;
   handleStartStopClick: () => void;
   registerFunction: (name: string, fn: Function) => void;
@@ -27,19 +27,62 @@ interface UseWebRTCAudioSessionReturn {
   currentVolume: number;
   conversation: Conversation[];
   sendTextMessage: (text: string) => void;
+  showForm: boolean;
+  debateInfo: {
+    username: string;
+    topic: string;
+    stance: "FOR" | "AGAINST";
+  } | null;
+  handleDebateFormSubmit: (values: {
+    username: string;
+    topic: string;
+    stance: "FOR" | "AGAINST";
+  }) => void;
+  timer: string;
+  showSummary: boolean;
+  resetAndStartNewDebate: () => void;
 }
 
 /**
  * Hook to manage a real-time session with OpenAI's Realtime endpoints.
  */
 export default function useWebRTCAudioSession(
-  voice: string,
-  tools?: Tool[],
+  tools?: Tool[]
 ): UseWebRTCAudioSessionReturn {
-  const { t, locale } = useTranslations();
   // Connection/session states
   const [status, setStatus] = useState("");
   const [isSessionActive, setIsSessionActive] = useState(false);
+
+
+  // Timer state
+  const [timer, setTimer] = useState("00:00");
+  const timerIntervalRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  // Format elapsed time in min:sec
+  const formatTime = (timeInSeconds: number): string => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  };
+
+  // Update timer every second
+  const updateTimer = () => {
+    if (!startTimeRef.current) return;
+
+    const elapsedTime = (Date.now() - startTimeRef.current) / 1000;
+    setTimer(formatTime(elapsedTime));
+  };
+
+  // Debate form states
+  const [showForm, setShowForm] = useState(true);
+  const [debateInfo, setDebateInfo] = useState<{
+    username: string;
+    topic: string;
+    stance: "FOR" | "AGAINST";
+  } | null>(null);
 
   // Audio references for local mic
   // Approach A: explicitly typed as HTMLDivElement | null
@@ -71,6 +114,9 @@ export default function useWebRTCAudioSession(
    */
   const ephemeralUserMessageIdRef = useRef<string | null>(null);
 
+  // Summary mode state
+  const [showSummary, setShowSummary] = useState(false);
+
   /**
    * Register a function (tool) so the AI can call it.
    */
@@ -82,7 +128,7 @@ export default function useWebRTCAudioSession(
    * Configure the data channel on open, sending a session update to the server.
    */
   function configureDataChannel(dataChannel: RTCDataChannel) {
-    // Send session update
+    // Send session update with properly formatted tools
     const sessionUpdate = {
       type: "session.update",
       session: {
@@ -93,26 +139,19 @@ export default function useWebRTCAudioSession(
         },
       },
     };
+
     dataChannel.send(JSON.stringify(sessionUpdate));
 
-    console.log("Session update sent:", sessionUpdate);
-    console.log("Setting locale: " + t("language") + " : " + locale);
-
-    // Send language preference message
-    const languageMessage = {
-      type: "conversation.item.create",
-      item: {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: t("languagePrompt"),
-          },
-        ],
+    const startMessage = {
+      type: "response.create",
+      response: {
+        instructions:
+          "Greet the user and ask them to start the debate. Topic is " + debateInfo?.topic + " and user's stance is " + debateInfo?.stance,
       },
     };
-    dataChannel.send(JSON.stringify(languageMessage));
+    dataChannel.send(JSON.stringify(startMessage));
+
+    console.log("Session update sent with tools:", sessionUpdate);
   }
 
   /**
@@ -153,7 +192,7 @@ export default function useWebRTCAudioSession(
           return { ...msg, ...partial };
         }
         return msg;
-      }),
+      })
     );
   }
 
@@ -277,22 +316,88 @@ export default function useWebRTCAudioSession(
          * AI calls a function (tool)
          */
         case "response.function_call_arguments.done": {
+          // Log the function call for debugging
+          console.log(
+            `AI is calling function: ${msg.name} with arguments:`,
+            msg.arguments
+          );
+
+          // Look up the function in our registry
           const fn = functionRegistry.current[msg.name];
           if (fn) {
-            const args = JSON.parse(msg.arguments);
-            const result = await fn(args);
+            try {
+              // Parse the JSON arguments
+              const args = JSON.parse(msg.arguments);
 
-            // Respond with function output
-            const response = {
+              // Execute the function with provided arguments
+              const result = await fn(args);
+
+              // Create a properly formatted response for the function call output
+              const response = {
+                type: "conversation.item.create",
+                item: {
+                  type: "function_call_output",
+                  call_id: msg.call_id,
+                  output: JSON.stringify(result),
+                },
+              };
+
+              // Send the function output back to the AI
+              dataChannelRef.current?.send(JSON.stringify(response));
+
+              // Tell the AI to continue generating a response
+              const responseCreate = {
+                type: "response.create",
+              };
+              dataChannelRef.current?.send(JSON.stringify(responseCreate));
+
+              console.log(
+                `Function ${msg.name} executed successfully with result:`,
+                result
+              );
+            } catch (error) {
+              console.error(`Error executing function ${msg.name}:`, error);
+
+              // Return error message if function execution fails
+              const errorResponse = {
+                type: "conversation.item.create",
+                item: {
+                  type: "function_call_output",
+                  call_id: msg.call_id,
+                  output: JSON.stringify({
+                    error: `Error executing function: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  }),
+                },
+              };
+
+              dataChannelRef.current?.send(JSON.stringify(errorResponse));
+
+              // Tell the AI to continue
+              const responseCreate = {
+                type: "response.create",
+              };
+              dataChannelRef.current?.send(JSON.stringify(responseCreate));
+            }
+          } else {
+            console.error(`Function ${msg.name} not found in registry`);
+
+            // Return error if function not found
+            const notFoundResponse = {
               type: "conversation.item.create",
               item: {
                 type: "function_call_output",
                 call_id: msg.call_id,
-                output: JSON.stringify(result),
+                output: JSON.stringify({
+                  error: `Function ${msg.name} not found`,
+                }),
               },
             };
-            dataChannelRef.current?.send(JSON.stringify(response));
 
+            dataChannelRef.current?.send(JSON.stringify(notFoundResponse));
+
+            // Tell the AI to continue
             const responseCreate = {
               type: "response.create",
             };
@@ -316,13 +421,37 @@ export default function useWebRTCAudioSession(
   }
 
   /**
-   * Fetch ephemeral token from your Next.js endpoint
+   * Handle debate form submission
    */
-  async function getEphemeralToken() {
+  const handleDebateFormSubmit = (values: {
+    username: string;
+    topic: string;
+    stance: "FOR" | "AGAINST";
+  }) => {
+    // Set the debate info in state for UI purposes only
+    setDebateInfo(values);
+    setShowForm(false);
+    // Start session and pass the values directly
+    startSession(values);
+  };
+
+  /**
+   * Get an ephemeral token for this session
+   */
+  async function getEphemeralToken(
+    debateInfo: {
+      username: string;
+      topic: string;
+      stance: "FOR" | "AGAINST";
+    } | null
+  ) {
     try {
+      // Always send the debate info to API, even if null
+      // The API will handle default values if needed
       const response = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ debateInfo }),
       });
       if (!response.ok) {
         throw new Error(`Failed to get ephemeral token: ${response.status}`);
@@ -383,15 +512,34 @@ export default function useWebRTCAudioSession(
   /**
    * Start a new session:
    */
-  async function startSession() {
+  async function startSession(
+    debateValues?: {
+      username: string;
+      topic: string;
+      stance: "FOR" | "AGAINST";
+    } | null
+  ) {
     try {
+      // Reset and start timer
+      startTimeRef.current = Date.now();
+      setTimer("00:00");
+
+      // Start timer interval
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      timerIntervalRef.current = window.setInterval(updateTimer, 1000);
+
       setStatus("Requesting microphone access...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       setupAudioVisualization(stream);
 
+      // Use the directly passed values or fall back to state
+      const valueToUse = debateValues || debateInfo;
+
       setStatus("Fetching ephemeral token...");
-      const ephemeralToken = await getEphemeralToken();
+      const ephemeralToken = await getEphemeralToken(valueToUse);
 
       setStatus("Establishing connection...");
       const pc = new RTCPeerConnection();
@@ -439,6 +587,7 @@ export default function useWebRTCAudioSession(
       // Send SDP offer to OpenAI Realtime
       const baseUrl = "https://api.openai.com/v1/realtime";
       const model = "gpt-4o-realtime-preview-2024-12-17";
+      const voice = "alloy"; // Use a fixed voice value
       const response = await fetch(`${baseUrl}?model=${model}&voice=${voice}`, {
         method: "POST",
         body: offer.sdp,
@@ -451,7 +600,6 @@ export default function useWebRTCAudioSession(
       // Set remote description
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-
       setIsSessionActive(true);
       setStatus("Session established successfully!");
     } catch (err) {
@@ -465,6 +613,13 @@ export default function useWebRTCAudioSession(
    * Stop the session & cleanup
    */
   function stopSession() {
+    // Stop timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    // Don't reset startTimeRef to keep the final time
+
     if (dataChannelRef.current) {
       dataChannelRef.current.close();
       dataChannelRef.current = null;
@@ -495,8 +650,25 @@ export default function useWebRTCAudioSession(
     setCurrentVolume(0);
     setIsSessionActive(false);
     setStatus("Session stopped");
+
+    // Show summary instead of form
+    setShowSummary(true);
+    setShowForm(false);
+  }
+
+  /**
+   * Reset everything and start a new debate
+   */
+  function resetAndStartNewDebate() {
+    // Reset conversation, messages, and timer
     setMsgs([]);
     setConversation([]);
+    setTimer("00:00");
+    startTimeRef.current = null;
+
+    // Hide summary and show form
+    setShowSummary(false);
+    setShowForm(true);
   }
 
   /**
@@ -506,7 +678,8 @@ export default function useWebRTCAudioSession(
     if (isSessionActive) {
       stopSession();
     } else {
-      startSession();
+      // Only pass debateInfo if it's not null
+      debateInfo ? startSession(debateInfo) : startSession();
     }
   }
 
@@ -514,13 +687,16 @@ export default function useWebRTCAudioSession(
    * Send a text message through the data channel
    */
   function sendTextMessage(text: string) {
-    if (!dataChannelRef.current || dataChannelRef.current.readyState !== "open") {
+    if (
+      !dataChannelRef.current ||
+      dataChannelRef.current.readyState !== "open"
+    ) {
       console.error("Data channel not ready");
       return;
     }
 
     const messageId = uuidv4();
-    
+
     // Add message to conversation immediately
     const newMessage: Conversation = {
       id: messageId,
@@ -530,8 +706,8 @@ export default function useWebRTCAudioSession(
       isFinal: true,
       status: "final",
     };
-    
-    setConversation(prev => [...prev, newMessage]);
+
+    setConversation((prev) => [...prev, newMessage]);
 
     // Send message through data channel
     const message = {
@@ -551,9 +727,10 @@ export default function useWebRTCAudioSession(
     const response = {
       type: "response.create",
     };
-    
+
     dataChannelRef.current.send(JSON.stringify(message));
-    dataChannelRef.current.send(JSON.stringify(response));}
+    dataChannelRef.current.send(JSON.stringify(response));
+  }
 
   // Cleanup on unmount
   useEffect(() => {
@@ -573,5 +750,11 @@ export default function useWebRTCAudioSession(
     currentVolume,
     conversation,
     sendTextMessage,
+    showForm,
+    debateInfo,
+    handleDebateFormSubmit,
+    timer,
+    showSummary,
+    resetAndStartNewDebate
   };
 }

@@ -2,11 +2,9 @@
 
 import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ThreeDotsWave from "@/components/ui/three-dots-wave";
 import { Conversation } from "@/lib/conversations";
-import { useTranslations } from "@/components/translations-context";
 
 /**
 * Avatar building blocks with Radix
@@ -61,11 +59,11 @@ function shouldDisplayMessage(msg: Conversation): boolean {
  const { role, text, status, isFinal } = msg;
 
  if (role === "assistant") {
-   // Always display assistant messages (even if they're empty, though that’s rare).
+   // Always display assistant messages (even if they're empty, though that's rare).
    return true;
  } else {
    // User role
-   // 1) If user is currently speaking or processing, we show it (wave or “Processing…”).
+   // 1) If user is currently speaking or processing, we show it (wave or "Processing…").
    if (status === "speaking" || status === "processing") {
      return true;
    }
@@ -87,10 +85,7 @@ function ConversationItem({ message }: { message: Conversation }) {
  const msgStatus = message.status;
 
  return (
-   <motion.div
-     initial={{ opacity: 0, x: isUser ? 20 : -20, y: 10 }}
-     animate={{ opacity: 1, x: 0, y: 0 }}
-     transition={{ duration: 0.3, ease: "easeOut" }}
+   <div
      className={`flex items-start gap-3 ${isUser ? "justify-end" : ""}`}
    >
      {/* Assistant Avatar */}
@@ -107,7 +102,7 @@ function ConversationItem({ message }: { message: Conversation }) {
          isUser
            ? "bg-primary text-background"
            : "bg-secondary dark:text-foreground"
-       } px-4 py-2 rounded-lg max-w-[70%] motion-preset-slide-up-right`}
+       } px-4 py-2 rounded-lg max-w-[70%]`}
      >
        {(isUser && msgStatus === "speaking") || msgStatus === "processing" ? (
          // Show wave animation for "speaking" status
@@ -133,7 +128,7 @@ function ConversationItem({ message }: { message: Conversation }) {
          <AvatarFallback>You</AvatarFallback>
        </Avatar>
      )}
-   </motion.div>
+   </div>
  );
 }
 
@@ -144,39 +139,33 @@ interface TranscriberProps {
 
 export default function Transcriber({ conversation }: TranscriberProps) {
  const scrollRef = React.useRef<HTMLDivElement>(null);
- const { t } = useTranslations();
 
- // Scroll to bottom whenever conversation updates
  React.useEffect(() => {
    if (scrollRef.current) {
      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
    }
  }, [conversation]);
 
- // Filter out messages that we do not want to display
  const displayableMessages = React.useMemo(() => {
-   return conversation.filter(shouldDisplayMessage);
+  return conversation.filter(shouldDisplayMessage);
  }, [conversation]);
 
  return (
-   <div className="flex flex-col w-full h-full mx-auto bg-background rounded-lg shadow-lg overflow-hidden dark:bg-background">
-     {/* Header */}
-     <div className="bg-secondary px-4 py-3 flex items-center justify-between dark:bg-secondary">
-       <div className="font-medium text-foreground dark:text-foreground">
-        {t('transcriber.title')}
-       </div>
-     </div>
-
-     {/* Body */}
+   <div className="flex flex-col w-full h-full mx-auto bg-background rounded-lg overflow-hidden dark:bg-background">
      <div
        ref={scrollRef}
-       className="flex-1 h-full overflow-y-auto p-4 space-y-4 z-50 scrollbar-thin scrollbar-thumb-primary"
+       className="flex-1 max-h-[400px] overflow-y-auto p-4 space-y-4 z-50 scrollbar-thin scrollbar-thumb-primary"
      >
-       <AnimatePresence>
-         {displayableMessages.map((message) => (
+       {displayableMessages.length === 0 ? (
+         <div className="text-center py-8 text-muted-foreground">
+           <p>No conversation started yet.</p>
+           <p className="text-sm">Press the microphone button to begin.</p>
+         </div>
+       ) : (
+         displayableMessages.map((message) => (
            <ConversationItem key={message.id} message={message} />
-         ))}
-       </AnimatePresence>
+         ))
+       )}
      </div>
    </div>
  );
