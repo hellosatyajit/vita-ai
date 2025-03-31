@@ -5,6 +5,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cn } from "@/lib/utils";
 import ThreeDotsWave from "@/components/ui/three-dots-wave";
 import { Conversation } from "@/lib/conversations";
+import { useUser } from "@/contexts/user-context";
 
 /**
 * Avatar building blocks with Radix
@@ -88,10 +89,8 @@ function ConversationItem({ message }: { message: Conversation }) {
    <div
      className={`flex items-start gap-3 ${isUser ? "justify-end" : ""}`}
    >
-     {/* Assistant Avatar */}
      {isAssistant && (
        <Avatar className="w-8 h-8 shrink-0">
-         {/* <AvatarImage src="/placeholder-user.jpg" /> */}
          <AvatarFallback>AI</AvatarFallback>
        </Avatar>
      )}
@@ -105,14 +104,11 @@ function ConversationItem({ message }: { message: Conversation }) {
        } px-4 py-2 rounded-lg max-w-[70%]`}
      >
        {(isUser && msgStatus === "speaking") || msgStatus === "processing" ? (
-         // Show wave animation for "speaking" status
          <ThreeDotsWave />
        ) : (
-         // Otherwise, show the message text or final text)
          <p>{message.text}</p>
        )}
 
-       {/* Timestamp below */}
        <div className="text-xs text-muted-foreground">
          {new Date(message.timestamp).toLocaleTimeString("en-US", {
            hour: "numeric",
@@ -121,10 +117,8 @@ function ConversationItem({ message }: { message: Conversation }) {
        </div>
      </div>
 
-     {/* User Avatar */}
      {isUser && (
        <Avatar className="w-8 h-8 shrink-0">
-         {/* <AvatarImage src="/placeholder-user.jpg" /> */}
          <AvatarFallback>You</AvatarFallback>
        </Avatar>
      )}

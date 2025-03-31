@@ -1,168 +1,88 @@
-"use client"
+"use server"
 
-import React, { useEffect } from "react"
-import useWebRTCAudioSession from "@/hooks/use-webrtc"
-import { BroadcastButton } from "@/components/broadcast-button"
-import { TokenUsageDisplay } from "@/components/token-usage"
-import { MessageControls } from "@/components/message-controls"
-import { TextInput } from "@/components/text-input"
-import { DebateForm } from "@/components/debate-form"
 import { Button } from "@/components/ui/button"
-import { AlertCircle } from "lucide-react"
-import { tools } from "@/lib/tools"
+import { createClient } from "@/utils/supabase/server"
+import Link from "next/link"
 
-const App: React.FC = () => {
-  // Use the WebRTC hook with built-in debate form functionality
-  const {
-    status,
-    isSessionActive,
-    handleStartStopClick,
-    registerFunction,
-    msgs,
-    conversation,
-    sendTextMessage,
-    showForm,
-    debateInfo,
-    handleDebateFormSubmit,
-    timer,
-    showSummary,
-    resetAndStartNewDebate,
-    stopSession
-  } = useWebRTCAudioSession(tools);
+const FEATURES = [
+  {
+    title: "Real-time AI Debate Practice",
+    description: "AI opponent that challenges your arguments in real-time. It's like debating with a knowledgeable partner who adapts to your style and provides thoughtful responses."
+  },
+  {
+    title: "Comprehensive Feedback",
+    description: "After each debate, receive a detailed breakdown of your performance with actionable tips for improvement. Track your progress over time as you develop your skills."
+  },
+  {
+    title: "Track Your Progress",
+    description: "Review your past debates and see how your skills evolve over time. Identify patterns in your argumentation style and focus your practice on areas that need improvement."
+  },
+  {
+    title: "Practice Anywhere, Anytime",
+    description: "No need to coordinate with human partners. Practice at your own pace and schedule, whenever inspiration strikes or before important speaking events."
+  }
+]
 
-  // Register tool functions
-  useEffect(() => {
-    // Register the end_debate function
-    registerFunction("end_debate", ({
-      reason,
-      explanation
-    }: {
-      reason: string;
-      explanation?: string;
-    }) => {
-      console.log("AI called end_debate:", { reason, explanation });
-
-      // Add a small delay before ending the debate to allow message to be displayed
-      setTimeout(() => {
-        stopSession();
-      }, 2000);
-
-      return { success: true, message: "Debate ended" };
-    });
-
-    // Register the time_warning function
-    registerFunction("time_warning", ({
-      remaining_seconds,
-      message
-    }: {
-      remaining_seconds: number;
-      message?: string;
-    }) => {
-      console.log("AI issued time warning:", { remaining_seconds, message });
-
-      return {
-        success: true,
-        message: "Time warning issued",
-        remaining_seconds
-      };
-    });
-  }, [registerFunction, stopSession]);
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <main className="h-full flex items-center justify-center">
-      {showForm ? (
-        <div className="w-full max-w-xl bg-card text-card-foreground rounded-xl border shadow-sm p-6 space-y-4">
-          <h2 className="text-xl font-bold text-center mb-4">Debate Practice</h2>
-          <DebateForm onSubmit={handleDebateFormSubmit} />
+    <main className="min-h-svh flex flex-col items-center bg-[#fff8dc] text-[#333333]">
+      {/* Nav */}
+      <div className="w-full max-w-5xl px-5 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-xl font-instrument">Vita AI</span>
         </div>
-      ) : showSummary ? (
-        <div className="w-full max-w-3xl bg-card text-card-foreground rounded-xl border shadow-sm p-6 space-y-4">
-          <div className="mb-4">
-            {/* Debate Info Section */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Debate Summary</h2>
-              <div className="text-right">
-                <div className="text-xl font-mono font-bold">{timer}</div>
-                <p className="text-xs text-muted-foreground">Total Duration</p>
-              </div>
-            </div>
+        <div className="flex items-center gap-4">
+          <Link href="https://github.com/hellosatyajit/debate-ai" className="text-sm hover:underline">Github</Link>
+        </div>
+      </div>
 
-            {debateInfo && (
-              <div className="mb-4 p-3 bg-muted rounded-md">
-                <h3 className="font-medium">Topic: {debateInfo.topic}</h3>
-                <p className="text-sm">
-                  {debateInfo.username}'s stance: {debateInfo.stance}
-                </p>
-              </div>
-            )}
+      <div className="w-full max-w-3xl mx-auto mt-12 mb-20 px-4 text-center">
 
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <TokenUsageDisplay messages={msgs} />
-            </div>
-          </div>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4 font-instrument">Turn your ideas into powerful debates</h1>
+        <h2 className="text-xl md:text-xl text-[#555] mb-8 max-w-2xl mx-auto">
+          For speakers & debaters who want live, serious practice without complicated tools. It's like a personal debate coach that never gets tired.
+        </h2>
 
-          {/* Transcription Section */}
-          <div className="mb-4">
-            <h3 className="font-medium mb-2">Transcript</h3>
-            <div className="max-h-80 overflow-y-auto p-3 border rounded-md">
-              {conversation.map((msg) => (
-                <div key={msg.id} className="mb-2">
-                  <p className="text-sm font-semibold">
-                    {msg.role === "user" ? debateInfo?.username || "You" : "AI"}:
-                  </p>
-                  <p className="pl-2 border-l-2 border-primary">{msg.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Button
-            onClick={resetAndStartNewDebate}
-            className="w-full"
-          >
-            Start New Debate
+        <div className="flex gap-4 justify-center mb-6">
+          <Button asChild className="px-8 py-6 rounded-md" size="lg">
+            <Link href={user ? "/app/practise" : "/login"}>Start Practicing Now</Link>
           </Button>
         </div>
-      ) : (
-        <div className="w-full max-w-3xl bg-card text-card-foreground rounded-xl border shadow-sm p-6 space-y-4">
-          {/* Debate Info & Controls Section */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-left">
-                {debateInfo && (
-                  <div>
-                    <h3 className="font-medium">Debating: {debateInfo.topic}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Your stance: {debateInfo.stance}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="text-xl font-mono font-bold">{timer}</div>
-                <p className="text-xs text-muted-foreground">Time Elapsed</p>
-              </div>
-            </div>
+      </div>
 
-            <div className="flex flex-col items-center gap-4 mb-4">
-              <BroadcastButton
-                isSessionActive={isSessionActive}
-                onClick={handleStartStopClick}
-              />
-            </div>
+      <div className="w-full max-w-5xl mx-auto mb-20 text-[#f3e9c2]">
+        <svg width="100%" height="20" viewBox="0 0 1000 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 10C166.667 3.33333 333.333 0 500 0C666.667 0 833.333 3.33333 1000 10V10C833.333 16.6667 666.667 20 500 20C333.333 20 166.667 16.6667 0 10V10Z" fill="currentColor" />
+        </svg>
+      </div>
+
+      <div className="w-full max-w-3xl mx-auto px-4 text-center mb-20">
+        <p className="text-lg text-[#555]">Here's some of the highlights of the features you get when you decide to use Vita AI.</p>
+      </div>
+
+      <div id="features" className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 px-6 mb-24">
+        {FEATURES.map((feature, index) => (
+          <div key={index} className="p-6 border border-[#f3e9c2] rounded-lg">
+            <h3 className="text-2xl font-bold mb-4 font-instrument">{feature.title}</h3>
+            <p className="text-[#555]">
+              {feature.description}
+            </p>
           </div>
+        ))}
+      </div>
 
-          {/* Transcription Section */}
-          {status && (
-            <div className="w-full">
-              <MessageControls conversation={conversation} msgs={msgs} />
-              {/* Text input is hidden as requested */}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="w-full max-w-3xl mx-auto px-6 text-center mb-20">
+        <Button asChild className="bg-[#333] hover:bg-[#222] text-white px-8 py-6 rounded-md mx-auto" size="lg">
+          <Link href={user ? "/app/practise" : "/login"}>Start Practicing Now</Link>
+        </Button>
+      </div>
+
+      <div className="w-full py-6 border-t border-[#e5e0d5] text-center text-sm text-[#777]">
+        <p>Crafted with ❤️ by <Link href="https://satyajit.xyz" className="hover:underline">Satyajit</Link> & <Link href="https://linkedin.com/in/jaybhattwrites" className="hover:underline">Jay</Link></p>
+      </div>
     </main>
   )
 }
-
-export default App;

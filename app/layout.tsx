@@ -1,21 +1,26 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Instrument_Serif } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/header";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { siteConfig } from "@/config/site";
-import { Toaster } from "@/components/ui/sonner"
-import { Analytics } from "@vercel/analytics/react"
+import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/react";
+import { UserProvider } from "@/contexts/user-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
+});
 
 export const metadata: Metadata = {
-  title: "Next.js + OpenAI Realtime API (WebRTC)",
-  description: "Next.js Starter for using the OpenAI Realtime API WebRTC method. Starter showcases capabilities of OpenAI's latest Realtime API (12/17/2024). It has all shadcn/ui components to build your own real-time voice AI application. Fastest & latest way to do Voice AI (Dec 2024), implementing API advancements of Day of OpenAI's 12 days of Christmas.",
+  title: "Vita AI: Turn your ideas into powerful debates",
+  description: "Vita AI is a platform that allows you to practice your debates. It uses AI to help you prepare for your debates and to help you win.",
   authors: [{ name: siteConfig.author, url: siteConfig.links.twitter }],
   creator: siteConfig.author,
   metadataBase: new URL(siteConfig.url),
@@ -25,7 +30,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
-  keywords: ["AI Blocks", "OpenAI Blocks", "Blocks", "OpenAI Realtime API", "OpenAI Realtime", "OpenAI WebRTC", "Livekit", "OpenAI Realtime WebRTC", "OpenAI Realtime Starter", "Voice AI", "Voice AI components", "web components", "UI components", "UI Library", "shadcn", "aceternity", "AI", "Next.js", "React", "Tailwind CSS", "Framer Motion", "TypeScript", "Design engineer", "shadcn ai"],
+  keywords: ["Debate", "Debating", "Debate AI", "Debate Platform", "Debate Preparation", "Debate Training", "Debate Skills", "Debate Strategies", "Debate Tips", "Debate Techniques", "Debate Training", "Debate Preparation", "Debate Strategies", "Debate Tips", "Debate Techniques"],
 };
 
 export default function RootLayout({
@@ -38,23 +43,25 @@ export default function RootLayout({
       <body
         className={cn(
           "min-h-dvh bg-background font-sans antialiased",
-          geistSans.variable
+          geistSans.variable,
+          instrumentSerif.variable
         )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="relative min-h-dvh bg-background">
-            <Header />
-            <main className="">
-              {children}
-            </main>
-          </div>
-          <Toaster />
-        </ThemeProvider>
+        <UserProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="relative min-h-dvh bg-background">
+              <main className="">
+                {children}
+              </main>
+            </div>
+            <Toaster />
+          </ThemeProvider>
+        </UserProvider>
         <Analytics />
       </body>
     </html>

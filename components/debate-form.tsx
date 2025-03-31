@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { debateTopics } from "@/lib/debate-topics"
 import { Shuffle } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useUser } from "@/contexts/user-context"
 
 interface DebateFormProps {
   onSubmit: (values: {
@@ -18,9 +19,16 @@ interface DebateFormProps {
 }
 
 export function DebateForm({ onSubmit }: DebateFormProps) {
-  const [username, setUsername] = React.useState("Satyajit")
-  const [topic, setTopic] = React.useState("Schools should prioritize practical skills over theoretical knowledge.")
+  const { userProfile, loading } = useUser()
+  const [username, setUsername] = React.useState(userProfile?.name || "")
+  const [topic, setTopic] = React.useState("")
   const [stance, setStance] = React.useState<"FOR" | "AGAINST">("FOR")
+
+  React.useEffect(() => {
+    if (userProfile?.name) {
+      setUsername(userProfile.name)
+    }
+  }, [userProfile])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,34 +39,26 @@ export function DebateForm({ onSubmit }: DebateFormProps) {
     const randomIndex = Math.floor(Math.random() * debateTopics.length)
     setTopic(debateTopics[randomIndex])
   }
-  
-  const randomizeDebate = () => {
-    // Select random topic
-    const randomIndex = Math.floor(Math.random() * debateTopics.length)
-    setTopic(debateTopics[randomIndex])
-    
-    // Select random stance
-    const randomStance = Math.random() > 0.5 ? "FOR" : "AGAINST"
-    setStance(randomStance)
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="username" className="block">Your Name</Label>
+      {/* <div className="space-y-2">
+        <Label htmlFor="username" className="text-foreground">Your Name</Label>
         <Input
           id="username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Enter your name"
           required
+          className="border-secondary focus:border-primary"
+          disabled={loading}
         />
-      </div>
+      </div> */}
 
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Label htmlFor="topic">Debate Topic</Label>
+            <Label htmlFor="topic" className="text-foreground">Topic</Label>
           </div>
           <TooltipProvider>
             <Tooltip>
@@ -68,7 +68,7 @@ export function DebateForm({ onSubmit }: DebateFormProps) {
                   variant="outline" 
                   size="sm" 
                   onClick={selectRandomTopic}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 border-secondary hover:bg-secondary/20"
                 >
                   <Shuffle className="h-3 w-3" />
                   Random Topic
@@ -88,40 +88,37 @@ export function DebateForm({ onSubmit }: DebateFormProps) {
           }}
           placeholder="Enter debate topic"
           required
+          className="border-secondary focus:border-primary"
         />
       </div>
 
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <Label>Your Stance</Label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={randomizeDebate}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-          >
-            <Shuffle className="h-3 w-3" />
-            Randomize Everything
-          </Button>
+          <Label className="text-foreground">Your Stance</Label>
         </div>
         <RadioGroup
           value={stance}
           onValueChange={(value) => setStance(value as "FOR" | "AGAINST")}
-          className="flex space-x-8 my-4"
+          className="flex gap-4 my-4"
         >
           <div className="flex items-center space-x-2">
-            <RadioGroupItem value="FOR" id="for" className="border-primary" />
+            <RadioGroupItem value="FOR" id="for" className="border-secondary text-primary" />
             <Label htmlFor="for" className="font-medium">For</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <RadioGroupItem value="AGAINST" id="against" className="border-primary" />
+            <RadioGroupItem value="AGAINST" id="against" className="border-secondary text-primary" />
             <Label htmlFor="against" className="font-medium">Against</Label>
           </div>
         </RadioGroup>
       </div>
 
-      <Button type="submit" className="w-full py-6 text-lg">Start Debate</Button>
+      <Button 
+        type="submit" 
+        className="w-full py-6 text-lg bg-[#333] hover:bg-[#222] text-white rounded-md"
+        disabled={loading}
+      >
+        Start Debate
+      </Button>
     </form>
   )
 } 

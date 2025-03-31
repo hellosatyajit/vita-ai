@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "@/lib/conversations";
 import { Tool } from "@/lib/tools";
+import { prompts, formatPrompt } from "@/lib/prompts";
 
 /**
  * The return type for the hook, matching Approach A
@@ -11,7 +12,7 @@ import { Tool } from "@/lib/tools";
  */
 interface UseWebRTCAudioSessionReturn {
   status: string;
-  isSessionActive: boolean;
+  isSessionActive: "inactive" | "active" | "connecting";
   audioIndicatorRef: React.RefObject<HTMLDivElement | null>;
   startSession: (
     debateValues?: {
@@ -51,8 +52,9 @@ export default function useWebRTCAudioSession(
 ): UseWebRTCAudioSessionReturn {
   // Connection/session states
   const [status, setStatus] = useState("");
-  const [isSessionActive, setIsSessionActive] = useState(false);
-
+  const [isSessionActive, setIsSessionActive] = useState<
+    "inactive" | "active" | "connecting"
+  >("inactive");
 
   // Timer state
   const [timer, setTimer] = useState("00:00");
@@ -100,7 +102,6 @@ export default function useWebRTCAudioSession(
   // Main conversation state
   const [conversation, setConversation] = useState<Conversation[]>([]);
 
-  // For function calls (AI "tools")
   const functionRegistry = useRef<Record<string, Function>>({});
 
   // Volume analysis (assistant inbound audio)
@@ -114,7 +115,6 @@ export default function useWebRTCAudioSession(
    */
   const ephemeralUserMessageIdRef = useRef<string | null>(null);
 
-  // Summary mode state
   const [showSummary, setShowSummary] = useState(false);
 
   /**
@@ -127,8 +127,14 @@ export default function useWebRTCAudioSession(
   /**
    * Configure the data channel on open, sending a session update to the server.
    */
-  function configureDataChannel(dataChannel: RTCDataChannel) {
-    // Send session update with properly formatted tools
+  function configureDataChannel(
+    dataChannel: RTCDataChannel,
+    debateInfo: {
+      username: string;
+      topic: string;
+      stance: "FOR" | "AGAINST";
+    } | null
+  ) {
     const sessionUpdate = {
       type: "session.update",
       session: {
@@ -142,16 +148,20 @@ export default function useWebRTCAudioSession(
 
     dataChannel.send(JSON.stringify(sessionUpdate));
 
-    const startMessage = {
-      type: "response.create",
-      response: {
-        instructions:
-          "Greet the user and ask them to start the debate. Topic is " + debateInfo?.topic + " and user's stance is " + debateInfo?.stance,
-      },
-    };
-    dataChannel.send(JSON.stringify(startMessage));
+    if (debateInfo) {
+      const formattedInstructions = formatPrompt(prompts.initialInstructions, {
+        username: debateInfo.username,
+        topic: debateInfo.topic,
+      });
 
-    console.log("Session update sent with tools:", sessionUpdate);
+      const startMessage = {
+        type: "response.create",
+        response: {
+          instructions: formattedInstructions,
+        },
+      };
+      dataChannel.send(JSON.stringify(startMessage));
+    }
   }
 
   /**
@@ -160,7 +170,6 @@ export default function useWebRTCAudioSession(
   function getOrCreateEphemeralUserId(): string {
     let ephemeralId = ephemeralUserMessageIdRef.current;
     if (!ephemeralId) {
-      // Use uuidv4 for a robust unique ID
       ephemeralId = uuidv4();
       ephemeralUserMessageIdRef.current = ephemeralId;
 
@@ -173,7 +182,6 @@ export default function useWebRTCAudioSession(
         status: "speaking",
       };
 
-      // Append the ephemeral item to conversation
       setConversation((prev) => [...prev, newMessage]);
     }
     return ephemeralId;
@@ -184,7 +192,7 @@ export default function useWebRTCAudioSession(
    */
   function updateEphemeralUserMessage(partial: Partial<Conversation>) {
     const ephemeralId = ephemeralUserMessageIdRef.current;
-    if (!ephemeralId) return; // no ephemeral user message to update
+    if (!ephemeralId) return;
 
     setConversation((prev) =>
       prev.map((msg) => {
@@ -209,7 +217,6 @@ export default function useWebRTCAudioSession(
   async function handleDataChannelMessage(event: MessageEvent) {
     try {
       const msg = JSON.parse(event.data);
-      // console.log("Incoming dataChannel message:", msg);
 
       switch (msg.type) {
         /**
@@ -259,7 +266,6 @@ export default function useWebRTCAudioSession(
          * Final user transcription
          */
         case "conversation.item.input_audio_transcription.completed": {
-          // console.log("Final user transcription:", msg.transcript);
           updateEphemeralUserMessage({
             text: msg.transcript || "",
             isFinal: true,
@@ -316,12 +322,6 @@ export default function useWebRTCAudioSession(
          * AI calls a function (tool)
          */
         case "response.function_call_arguments.done": {
-          // Log the function call for debugging
-          console.log(
-            `AI is calling function: ${msg.name} with arguments:`,
-            msg.arguments
-          );
-
           // Look up the function in our registry
           const fn = functionRegistry.current[msg.name];
           if (fn) {
@@ -350,11 +350,6 @@ export default function useWebRTCAudioSession(
                 type: "response.create",
               };
               dataChannelRef.current?.send(JSON.stringify(responseCreate));
-
-              console.log(
-                `Function ${msg.name} executed successfully with result:`,
-                result
-              );
             } catch (error) {
               console.error(`Error executing function ${msg.name}:`, error);
 
@@ -520,6 +515,7 @@ export default function useWebRTCAudioSession(
     } | null
   ) {
     try {
+      setIsSessionActive("connecting");
       // Reset and start timer
       startTimeRef.current = Date.now();
       setTimer("00:00");
@@ -572,8 +568,7 @@ export default function useWebRTCAudioSession(
       dataChannelRef.current = dataChannel;
 
       dataChannel.onopen = () => {
-        // console.log("Data channel open");
-        configureDataChannel(dataChannel);
+        configureDataChannel(dataChannel, valueToUse);
       };
       dataChannel.onmessage = handleDataChannelMessage;
 
@@ -587,7 +582,7 @@ export default function useWebRTCAudioSession(
       // Send SDP offer to OpenAI Realtime
       const baseUrl = "https://api.openai.com/v1/realtime";
       const model = "gpt-4o-realtime-preview-2024-12-17";
-      const voice = "alloy"; // Use a fixed voice value
+      const voice = "alloy";
       const response = await fetch(`${baseUrl}?model=${model}&voice=${voice}`, {
         method: "POST",
         body: offer.sdp,
@@ -600,12 +595,13 @@ export default function useWebRTCAudioSession(
       // Set remote description
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-      setIsSessionActive(true);
+      setIsSessionActive("active");
       setStatus("Session established successfully!");
     } catch (err) {
       console.error("startSession error:", err);
       setStatus(`Error: ${err}`);
       stopSession();
+      setIsSessionActive("inactive");
     }
   }
 
@@ -613,6 +609,7 @@ export default function useWebRTCAudioSession(
    * Stop the session & cleanup
    */
   function stopSession() {
+    if (isSessionActive === "inactive") return;
     // Stop timer
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -648,10 +645,9 @@ export default function useWebRTCAudioSession(
     ephemeralUserMessageIdRef.current = null;
 
     setCurrentVolume(0);
-    setIsSessionActive(false);
+    setIsSessionActive("inactive");
     setStatus("Session stopped");
 
-    // Show summary instead of form
     setShowSummary(true);
     setShowForm(false);
   }
@@ -664,6 +660,7 @@ export default function useWebRTCAudioSession(
     setMsgs([]);
     setConversation([]);
     setTimer("00:00");
+    setDebateInfo(null);
     startTimeRef.current = null;
 
     // Hide summary and show form
@@ -675,10 +672,12 @@ export default function useWebRTCAudioSession(
    * Toggle start/stop from a single button
    */
   function handleStartStopClick() {
-    if (isSessionActive) {
+    if (isSessionActive === "connecting") {
+      return;
+    }
+    if (isSessionActive === "active") {
       stopSession();
     } else {
-      // Only pass debateInfo if it's not null
       debateInfo ? startSession(debateInfo) : startSession();
     }
   }
@@ -697,7 +696,6 @@ export default function useWebRTCAudioSession(
 
     const messageId = uuidv4();
 
-    // Add message to conversation immediately
     const newMessage: Conversation = {
       id: messageId,
       role: "user",
@@ -709,7 +707,6 @@ export default function useWebRTCAudioSession(
 
     setConversation((prev) => [...prev, newMessage]);
 
-    // Send message through data channel
     const message = {
       type: "conversation.item.create",
       item: {
@@ -755,6 +752,6 @@ export default function useWebRTCAudioSession(
     handleDebateFormSubmit,
     timer,
     showSummary,
-    resetAndStartNewDebate
+    resetAndStartNewDebate,
   };
 }

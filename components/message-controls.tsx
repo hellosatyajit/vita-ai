@@ -67,19 +67,19 @@ function FilterControls({
   )
 }
 
+const SHOW_LOG_BUTTON = false;
+
 export function MessageControls({ conversation, msgs }: { conversation: Conversation[], msgs: MessageType[] }) {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
-  
+
   if (conversation.length === 0) return null
 
-  // Get unique message types
   const messageTypes = ["all", ...new Set(msgs.map(msg => msg.type))]
 
-  // Filter messages based on type and search query
   const filteredMsgs = msgs.filter(msg => {
     const matchesType = typeFilter === "all" || msg.type === typeFilter
-    const matchesSearch = searchQuery === "" || 
+    const matchesSearch = searchQuery === "" ||
       JSON.stringify(msg).toLowerCase().includes(searchQuery.toLowerCase())
     return matchesType && matchesSearch
   })
@@ -88,48 +88,50 @@ export function MessageControls({ conversation, msgs }: { conversation: Conversa
     <div className="space-y-2">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-base font-medium">Conversation Transcript</h3>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              View Detailed Logs
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-full p-4 mx-auto overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Conversation Logs</DialogTitle>
-            </DialogHeader>
-            <FilterControls
-              typeFilter={typeFilter}
-              setTypeFilter={setTypeFilter}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              messageTypes={messageTypes}
-              messages={filteredMsgs}
-            />
-            <div className="mt-4">
-              <ScrollArea className="h-[80vh]">
-              <Table className="max-w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Content</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMsgs.map((msg, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{msg.type}</TableCell>
-                      <TableCell className="font-mono text-sm whitespace-pre-wrap break-words max-w-full]">
-                        {JSON.stringify(msg, null, 2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {SHOW_LOG_BUTTON && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                View Detailed Logs
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-full p-4 mx-auto overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Conversation Logs</DialogTitle>
+              </DialogHeader>
+              <FilterControls
+                typeFilter={typeFilter}
+                setTypeFilter={setTypeFilter}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                messageTypes={messageTypes}
+                messages={filteredMsgs}
+              />
+              <div className="mt-4">
+                <ScrollArea className="h-[80vh]">
+                  <Table className="max-w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Content</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMsgs.map((msg, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">{msg.type}</TableCell>
+                          <TableCell className="font-mono text-sm whitespace-pre-wrap break-words max-w-full]">
+                            {JSON.stringify(msg, null, 2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="border rounded-lg overflow-hidden">
