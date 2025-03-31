@@ -8,19 +8,75 @@ import { MessageControls } from "@/components/message-controls"
 import { DebateForm } from "@/components/debate-form"
 import { Button } from "@/components/ui/button"
 import { tools } from "@/lib/tools"
-import { generateDebateSummary, saveDebate } from "../actions"
-import { Loader2 } from "lucide-react"
+import { generateDebateSummary, saveDebate, checkDebateCredits, useDebateCredit } from "../actions"
+import { Loader2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const DEBATE_CREDIT_LIMIT = 3;
+
+function LoadingSkeleton() {
+    return (
+        <div className="w-full max-w-xl text-card-foreground border-secondary py-4 md:p-4 space-y-6">
+            <Skeleton className="h-8 w-48" /> {/* Title */}
+            <Skeleton className="h-20 w-full" /> {/* Alert */}
+            <div className="space-y-4"> {/* Form fields */}
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-12 w-full" />
+            </div>
+        </div>
+    )
+}
 
 export default function PracticePage() {
     const router = useRouter()
     const [isSaving, setIsSaving] = useState(false)
     const [savingStage, setSavingStage] = useState<'idle' | 'analyzing' | 'saving'>('idle')
+    const [credits, setCredits] = useState<number | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+
+    const loadCredits = async () => {
+        try {
+            const count = await checkDebateCredits()
+            setCredits(count)
+        } catch (error) {
+            console.error("Error loading credits:", error)
+            toast.error("Failed to load credits")
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        loadCredits()
+    }, [])
+
+    const handleStartStopClick = async () => {
+        if (isSessionActive === 'connecting') {
+            return;
+        }
+        if (credits === 0) {
+            toast.error("No credits remaining!")
+            return
+        }
+
+        try {
+            handleStartStopWebRTC()
+            await useDebateCredit()
+            setCredits(prev => prev !== null ? prev - 1 : 0)
+        } catch (error) {
+            console.error("Error using credit:", error)
+            toast.error("Failed to use credit")
+        }
+
+    }
 
     const {
         status,
         isSessionActive,
-        handleStartStopClick,
+        handleStartStopClick: handleStartStopWebRTC,
         registerFunction,
         msgs,
         conversation,
@@ -106,12 +162,52 @@ export default function PracticePage() {
         });
     }, [registerFunction, stopSession, debateInfo, handleSaveDebate]);
 
+    if (isLoading) {
+        return (
+            <main className="h-full flex items-center justify-center bg-background">
+                <LoadingSkeleton />
+            </main>
+        );
+    }
+
+    if (credits !== null && credits === 0) {
+        return (
+            <main className="h-full flex items-center justify-center bg-background">
+                <div className="w-full max-w-xl p-8">
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>No Credits Remaining</AlertTitle>
+                        <AlertDescription>
+                            We are credit poor! You have used all your practice credits.
+                            Please try again later or contact support for more credits.
+                        </AlertDescription>
+                    </Alert>
+                    <div className="mt-4 flex justify-center">
+                        <Button variant="outline" onClick={() => router.push('/app')}>
+                            Return to Dashboard
+                        </Button>
+                    </div>
+                </div>
+            </main>
+        );
+    }
+
     return (
         <main className="h-full flex items-center justify-center bg-background">
-            <div className="w-full max-w-xl text-card-foreground border-secondary p-8 space-y-4">
+            <div className="w-full max-w-xl text-card-foreground border-secondary py-4 md:p-4 space-y-4">
                 {showForm ? (
                     <>
                         <h2 className="text-2xl font-bold">Debate Practice</h2>
+                        {credits !== null && (
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Credits Available</AlertTitle>
+                                <AlertDescription>
+                                    You have {credits} practice credits remaining.
+                                    A credit will be used when you start the debate.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <DebateForm onSubmit={handleDebateFormSubmit} />
                     </>
                 ) : showSummary ? (

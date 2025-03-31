@@ -11,7 +11,8 @@ export const profiles = pgTable('profiles', {
   username: text('username').unique(),
   fullName: text('full_name'),
   avatarUrl: text('avatar_url'),
-  email: text('email')
+  email: text('email'),
+  credits: integer('credits').notNull().default(3)
 });
 
 /**

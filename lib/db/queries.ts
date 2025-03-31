@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { db } from "./index";
 
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { Debate, debates, NewDebate, Profile, profiles } from "./schema";
 
 /**
@@ -98,3 +98,42 @@ export async function updateDebate(
 ): Promise<void> {
   await db.update(debates).set(data).where(eq(debates.id, debateId));
 }
+
+/**
+ * Get the count of debates for a user
+ */
+export const getUserDebateCount = cache(
+  async (userId: string): Promise<number> => {
+    const result = await db
+      .select({ count: sql`count(*)` })
+      .from(debates)
+      .where(eq(debates.userId, userId));
+
+    return Number(result[0].count);
+  }
+);
+
+/**
+ * Get user's remaining credits
+ */
+export const getUserCredits = cache(async (userId: string): Promise<number> => {
+  const [user] = await db
+    .select({ credits: profiles.credits })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+
+  return user?.credits ?? 0;
+});
+
+/**
+ * Decrease user's credits by 1
+ */
+export const decreaseUserCredits = async (userId: string): Promise<void> => {
+  await db
+    .update(profiles)
+    .set({
+      credits: sql`${profiles.credits} - 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(profiles.id, userId));
+};

@@ -111,7 +111,7 @@ When the debate time is up, simply state:
 "The debate has concluded. I appreciate the points you raised during our discussion."`
 
 const INITIAL_PROMPt =
-  "Alright, {username}, let's go. This debate on {topic} is not going to be easy for you. Who's starting—you, or me?";
+  "Greet the user and introduce the debate. Alright, {username}, let's go. This debate on {topic} is not going to be easy for you. Who's starting—you, or me?";
 
 const DEBATE_ANALYSIS_PROMPT = `You are an expert debate coach and analyst. Analyze the following debate transcript and provide a detailed, structured analysis. Focus on:
 

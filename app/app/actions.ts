@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createDebate, updateDebate, getDebateById } from '@/lib/db/queries';
+import { createDebate, updateDebate, getDebateById, getUserDebateCount, getUserCredits, decreaseUserCredits } from '@/lib/db/queries';
 import { db } from '@/lib/db';
 import { Conversation } from '@/lib/conversations';
 import { debates } from '@/lib/db/schema';
@@ -88,4 +88,32 @@ export async function deleteDebate(debateId: string): Promise<void> {
   
   revalidatePath('/app');
   redirect('/app');
+}
+
+/**
+ * Check user's remaining credits
+ */
+export async function checkDebateCredits(): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  
+  return getUserCredits(user.id);
+}
+
+/**
+ * Decrease user's credits when starting a debate
+ */
+export async function useDebateCredit(): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  await decreaseUserCredits(user.id);
 } 

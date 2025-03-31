@@ -35,7 +35,7 @@ export default async function HomePage() {
           <span className="font-bold text-xl font-instrument">Vita AI</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="https://github.com/hellosatyajit/debate-ai" className="text-sm hover:underline">Github</Link>
+          <Link href="https://github.com/hellosatyajit/vita-ai" className="text-sm hover:underline">Github</Link>
         </div>
       </div>
 

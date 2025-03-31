@@ -152,7 +152,7 @@ export default function useWebRTCAudioSession(
       const formattedInstructions = formatPrompt(prompts.initialInstructions, {
         username: debateInfo.username,
         topic: debateInfo.topic,
-      });
+      });      
 
       const startMessage = {
         type: "response.create",
