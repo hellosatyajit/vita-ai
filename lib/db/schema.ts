@@ -12,7 +12,7 @@ export const profiles = pgTable('profiles', {
   fullName: text('full_name'),
   avatarUrl: text('avatar_url'),
   email: text('email'),
-  credits: integer('credits').notNull().default(3)
+  credits: integer('credits').notNull().default(1)
 });
 
 /**

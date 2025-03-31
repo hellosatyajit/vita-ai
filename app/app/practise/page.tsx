@@ -14,8 +14,6 @@ import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 
-const DEBATE_CREDIT_LIMIT = 3;
-
 function LoadingSkeleton() {
     return (
         <div className="w-full max-w-xl text-card-foreground border-secondary py-4 md:p-4 space-y-6">

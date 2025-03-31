@@ -148,7 +148,7 @@ export default function DebateAnalysis({ analysis }: { analysis: DebateAnalysisT
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2">
+                  <div className="grid gap-6 grid-cols-2">
                     <div className="flex flex-col items-center">
                       <div className="relative flex h-32 w-32 items-center justify-center rounded-full border-8 border-primary/20 bg-primary/10">
                         <span className="text-4xl font-bold text-primary leading-none">{analysis.rhetorical_analysis.persuasiveness_score}</span>
